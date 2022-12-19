@@ -42,6 +42,8 @@ class PanierController extends AbstractController
 
         }
 
+        $panier = $session->get("panier", []);
+
         $checkout = $checkoutRepository->findBy(['checkout_id' => $panier['id']], ['id' => 'DESC'], 1);
 
         $payment_id = null;
@@ -77,7 +79,7 @@ class PanierController extends AbstractController
             $em->persist($checkout);
             $em->flush();
 
-            return $this->redirect($payment->url, Response::HTTP_SEE_OTHER);
+            return $this->redirect($payment->url);
            
         }else{
             return $this->redirectToRoute("app_home");

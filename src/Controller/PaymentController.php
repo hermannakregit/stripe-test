@@ -41,8 +41,6 @@ class PaymentController extends AbstractController
         );
 
         if($event->type == "checkout.session.completed"){
-
-            dump($event);
             
             $payment_id = $event->data['object']['id'];
             
