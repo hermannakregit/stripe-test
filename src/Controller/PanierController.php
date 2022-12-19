@@ -2,17 +2,20 @@
 
 namespace App\Controller;
 
+use App\Entity\Checkout;
+use App\Repository\CheckoutRepository;
 use App\service\StripePaymentService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class PanierController extends AbstractController
 
 {
     #[Route('/', name: 'app_home')]
-    public function index(SessionInterface $session): Response
+    public function index(SessionInterface $session, CheckoutRepository $checkoutRepository): Response
     {
 
         $panier = $session->get("panier", []);
@@ -28,17 +31,37 @@ class PanierController extends AbstractController
                 ]);
             }
 
-            $session->set("panier", $panier);
+            $id = uniqid();
+
+            $newPanier = [
+                'id' => $id,
+                'products' => $panier,
+            ];
+
+            $session->set("panier", $newPanier);
+
         }
 
-        shuffle($panier);
+        $checkout = $checkoutRepository->findBy(['checkout_id' => $panier['id']], ['id' => 'DESC'], 1);
+
+        $payment_id = null;
+        if(!empty($checkout) && $checkout[0]->isCompleted()){
+            $payment_id = $checkout[0]->getStripeId();
+        }
+
+        shuffle($panier['products']);
+
+        $context = [
+            'panier' => $panier['products'],
+            'payment_id' => $payment_id
+        ];
         
-        return $this->render('index.html.twig', compact('panier'));
+        return $this->render('index.html.twig', $context);
     }
 
 
     #[Route('/payment/checkout', name: 'app_payment')]
-    public function payment(SessionInterface $session): Response
+    public function payment(SessionInterface $session, EntityManagerInterface $em): Response
     {
 
         $panier = $session->get("panier", []);
@@ -48,6 +71,12 @@ class PanierController extends AbstractController
             $payment_session = new StripePaymentService($this->getParameter('stripe_payment_key'));
             $payment = $payment_session->startPayment($panier);
 
+            $checkout = new Checkout();
+            $checkout->setStripeId($payment->id);
+            $checkout->setCheckoutId($panier['id']);
+            $em->persist($checkout);
+            $em->flush();
+
             return $this->redirect($payment->url, Response::HTTP_SEE_OTHER);
            
         }else{
@@ -56,22 +85,4 @@ class PanierController extends AbstractController
         
     }
 
-    #[Route('/payment/link', name: 'app_payment_link')]
-    public function paymentLink(SessionInterface $session): Response
-    {
-
-        $panier = $session->get("panier", []);
-
-        if(!empty($panier)){
-
-            $payment_link = new StripePaymentService($this->getParameter('stripe_payment_key'));
-            $payment = $payment_link->linkPayment($panier);
-
-            return $this->redirectToRoute("app_home");
-           
-        }else{
-            return $this->redirectToRoute("app_home");
-        }
-        
-    }
 }

@@ -37,8 +37,12 @@
 
         <div class="mb-5">
             {% for message in app.flashes('success')  %}
-                <div class="alert alert-success">{{ message }}</div>
+                <div class="alert alert-success">
+                    {{ message }} <br/> 
+                    {% if payment_id %} Référence de paiement : {{ payment_id }} {% endif %}
+                </div>
             {% endfor %}
+
             {% for message in app.flashes('warning')  %}
                 <div class="alert alert-warning">{{ message }}</div>
             {% endfor %}

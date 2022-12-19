@@ -29,7 +29,7 @@ class StripePaymentService
 						],
 						'unit_amount' => $product['prix']
 					],
-				], $panier)
+				], $panier['products'])
 			],
 
 			'mode' => 'payment',
@@ -40,36 +40,11 @@ class StripePaymentService
 				'allowed_countries' => ['FR', 'CI', 'BE'],
 			],
 			'metadata' => [
-				'panier' => uniqid(),
+				'panier' => $panier['id'],
 			]
 		]);
 
 		return $session;
-
-	}
-
-	public function linkPayment(array $panier)
-	{
-		
-		$link = PaymentLink::create([
-			'line_items' => [
-				array_map(fn (array $product) => [
-					'quantity' => 1,
-					'price' => "$"."{$product['prix']}/month",
-					'adjustable_quantity' => [
-						'enabled' => true,
-					]
-				], $panier)
-			],
-			'billing_address_collection' => 'required',
-			'metadata' => [
-				'panier' => uniqid(),
-			]
-		]);
-
-		dd($link);
-
-		return $link;
 
 	}
 

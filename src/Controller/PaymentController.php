@@ -2,9 +2,13 @@
 
 namespace App\Controller;
 
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use App\Repository\CheckoutRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Stripe\Webhook;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class PaymentController extends AbstractController
 {
@@ -24,11 +28,31 @@ class PaymentController extends AbstractController
     }
 
 
-    #[Route('/stripe/webhook', name: 'app_stripe_webhook')]
-    public function index(): Response
+    #[Route('/webhook/stripe', name: 'app_stripe_webhook', methods: 'POST')]
+    public function webhookStripe(Request $request, CheckoutRepository $checkoutRepository, EntityManagerInterface $em): Response
     {
-        return $this->render('stripe_webhook/index.html.twig', [
-            'controller_name' => 'StripeWebhookController',
-        ]);
+        $signature = $request->headers->get('stripe-signature');
+        $body = (string)$request->getContent();
+
+        $event = Webhook::constructEvent(
+            $body,
+            $signature,
+            $this->getParameter('stripe_webhook_key')
+        );
+
+        if($event->type == "checkout.session.completed"){
+
+            dump($event);
+            
+            $payment_id = $event->data['object']['id'];
+            
+            $checkout = $checkoutRepository->findOneBy(['stripe_id' => $payment_id]);
+            $checkout->setCompleted(true);
+            $em->persist($checkout);
+            $em->flush();
+
+        }
+        
+        return new Response();
     }
 }
